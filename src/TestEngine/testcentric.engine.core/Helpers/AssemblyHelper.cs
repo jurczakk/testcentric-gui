@@ -3,7 +3,6 @@
 // Licensed under the MIT License. See LICENSE.txt in root directory.
 // ***********************************************************************
 
-#if !NETSTANDARD1_6
 using System;
 using System.IO;
 using System.Reflection;
@@ -16,6 +15,10 @@ namespace TestCentric.Engine.Helpers
     /// </summary>
     public static class AssemblyHelper
     {
+        // Fields not availble in Uri class for .NET standard 1.6
+        private const string UriSchemeFile = "file:";
+        private const string UriSchemeDelimiter = "//";
+
         /// <summary>
         /// Gets the path to the directory from which an assembly was loaded.
         /// </summary>
@@ -45,7 +48,7 @@ namespace TestCentric.Engine.Helpers
 
         private static bool IsFileUri(string uri)
         {
-            return uri.ToLower().StartsWith(Uri.UriSchemeFile);
+            return uri.ToLower().StartsWith(UriSchemeFile);
         }
 
         /// <summary>
@@ -57,7 +60,7 @@ namespace TestCentric.Engine.Helpers
         public static string GetAssemblyPathFromCodeBase(string codeBase)
         {
             // Skip over the file:// part
-            int start = Uri.UriSchemeFile.Length + Uri.SchemeDelimiter.Length;
+            int start = UriSchemeFile.Length + UriSchemeDelimiter.Length;
 
             if (codeBase[start] == '/') // third slash means a local path
             {
@@ -76,4 +79,3 @@ namespace TestCentric.Engine.Helpers
         }
     }
 }
-#endif

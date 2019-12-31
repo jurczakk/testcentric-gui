@@ -3,7 +3,6 @@
 // Licensed under the MIT License. See LICENSE.txt in root directory.
 // ***********************************************************************
 
-#if !NETCOREAPP1_1
 using System.IO;
 using NUnit.Framework;
 
@@ -22,7 +21,11 @@ namespace TestCentric.Engine.Helpers
         [Test]
         public void GetPathForAssembly()
         {
-            string path = AssemblyHelper.GetAssemblyPath(this.GetType().Assembly);
+#if NETCOREAPP1_1
+            string path = Path.Combine(TestContext.CurrentContext.TestDirectory, "testcentric.engine.core.tests.dll");
+#else
+            string path = AssemblyHelper.GetAssemblyPath(GetType().Assembly);
+#endif
             Assert.That(Path.GetFileName(path), Is.EqualTo(THIS_ASSEMBLY_PATH).IgnoreCase);
             Assert.That(File.Exists(path));
         }
@@ -61,4 +64,3 @@ namespace TestCentric.Engine.Helpers
         }
     }
 }
-#endif
