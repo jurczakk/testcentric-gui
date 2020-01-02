@@ -126,7 +126,8 @@ namespace Mono.Cecil.PE {
 			return null;
 		}
 
-		BinaryStreamReader GetReaderAt (RVA rva)
+        // TestCentric: Made this public
+		public BinaryStreamReader GetReaderAt (RVA rva)
 		{
 			var section = GetSectionAtVirtualAddress (rva);
 			if (section == null)

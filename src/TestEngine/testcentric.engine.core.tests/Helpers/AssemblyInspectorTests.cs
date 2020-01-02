@@ -4,9 +4,11 @@
 // ***********************************************************************
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using NUnit.Framework;
+using Mono.Cecil.Metadata;
 
 namespace TestCentric.Engine.Helpers
 {
@@ -32,35 +34,73 @@ namespace TestCentric.Engine.Helpers
             Assert.That(() => AssemblyInspector.ReadAssembly(path), Throws.TypeOf(exceptionType));
         }
 
-        [TestCase("TestCentric.Gui.Model.Tests.dll", true, true, false, "v4.0.30319")]
-        [TestCase("net35/testcentric.engine.core.tests.exe", true, true, false, "v2.0.50727")]
-        [TestCase("net35/testcentric.engine.core.dll", true, true, false, "v2.0.50727")]
-        [TestCase("net35/testcentric-agent.exe", true, true, false, "v2.0.50727")]
-        [TestCase("net35/testcentric-agent-x86.exe", true, true, true, "v2.0.50727")]
-        //[TestCase("net35/mock-cpp-clr-x64.dll", true, true, false, "v2.0.50727")]
-        //[TestCase("net35/mock-cpp-clr-x86.dll", true, true, true, "v2.0.50727")]
-        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll", true, true, false, "v4.0.30319")]
-        [TestCase("netcoreapp2.1/testcentric.engine.core.dll", true, true, false, "v4.0.30319")]
-        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll", true, true, false, "v4.0.30319")]
-        [TestCase("netcoreapp1.1/testcentric.engine.core.dll", true, true, false, "v4.0.30319")]
-        [TestCase("netstandard2.0/testcentric.engine.core.dll", true, true, false, "v4.0.30319")]
-        [TestCase("netstandard1.6/testcentric.engine.core.dll", true, true, false, "v4.0.30319")]
-        public void CanCreateFromPath(string path, bool isPeFile, bool isDotNetFile, bool runAsX86, string runTimeVersion)
+        [TestCase("TestCentric.Gui.Model.Tests.dll")]
+        [TestCase("net35/testcentric.engine.core.tests.exe")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll")]
+        [TestCase("netstandard2.0/testcentric.engine.core.dll")]
+        [TestCase("netstandard1.6/testcentric.engine.core.dll")]
+        public void CanCreateFromPath(string path)
         {
             path = GetAbsolutePath(path);
+            var inspector = AssemblyInspector.ReadAssembly(path);
 
-            //Assume.That(path, Does.Exist);
+            Assert.That(inspector.AssemblyPath, Is.EqualTo(path));
+            Assert.True(inspector.IsValidPeFile);
+            Assert.True(inspector.IsDotNetFile);
+        }
 
-            var rdr = AssemblyInspector.ReadAssembly(path);
+        [TestCase("net35/testcentric-agent.exe", false)]
+        [TestCase("net35/testcentric-agent-x86.exe", true)]
+        public void CanDetectRunAsX96(string path, bool runAsX86)
+        {
+            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
+            Assert.That(inspector.ShouldRun32Bit, Is.EqualTo(runAsX86));
+        }
 
-            Assert.Multiple(() =>
-            {
-                Assert.That(rdr.AssemblyPath, Is.EqualTo(path));
-                Assert.That(rdr.IsValidPeFile, Is.EqualTo(isPeFile));
-                Assert.That(rdr.IsDotNetFile, Is.EqualTo(isDotNetFile));
-                Assert.That(rdr.ShouldRun32Bit, Is.EqualTo(runAsX86));
-                Assert.That(rdr.ImageRuntimeVersion, Is.EqualTo(runTimeVersion));
-            });
+        [TestCase("TestCentric.Gui.Model.Tests.dll", "v4.0.30319")]
+        [TestCase("net35/testcentric.engine.core.tests.exe", "v2.0.50727")]
+        [TestCase("net35/testcentric.engine.core.dll", "v2.0.50727")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll", "v4.0.30319")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.dll", "v4.0.30319")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll", "v4.0.30319")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.dll", "v4.0.30319")]
+        [TestCase("netstandard2.0/testcentric.engine.core.dll", "v4.0.30319")]
+        [TestCase("netstandard1.6/testcentric.engine.core.dll", "v4.0.30319")]
+        public void CanAccessRuntimeVersion(string path, string runtimeVersion)
+        {
+            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
+            Assert.That(inspector.ImageRuntimeVersion, Is.EqualTo(runtimeVersion));
+        }
+
+        [TestCase("TestCentric.Gui.Model.Tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("TestCentric.Gui.Model.dll", "testcentric.engine.api")]
+        [TestCase("net35/testcentric.engine.core.tests.exe", "nunit.framework", "3.11.0.0")]
+        [TestCase("net35/testcentric.engine.core.dll", "testcentric.engine.api")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.dll", "testcentric.engine.api")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.dll", "testcentric.engine.api")]
+        [TestCase("netstandard2.0/testcentric.engine.core.dll", "testcentric.engine.api")]
+        [TestCase("netstandard1.6/testcentric.engine.core.dll", "testcentric.engine.api")]
+        public void CanEnumerateReferences(string path, string refName = null, string refVersion = null)
+        {
+            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
+
+            Assert.That(inspector.HasTable(Table.AssemblyRef));
+
+            if (refName == null)
+                return;
+
+            foreach (var reference in inspector.AssemblyReferences)
+                if (reference.Name == refName)
+                {
+                    if (refVersion != null)
+                        Assert.That(reference.Version, Is.EqualTo(new Version(refVersion)));
+                    Assert.Pass();
+                }
+
+            Assert.Fail($"No reference to {refName} was found");
         }
 
         // Convert relative paths to absolute based on the parent directory

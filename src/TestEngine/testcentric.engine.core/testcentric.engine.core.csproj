@@ -21,6 +21,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="ExecutionPlatform.cs" />
+    <Compile Remove="Helpers\Mono.Cecil\AssemblyReader.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\EngineVersion.cs" LinkBase="Properties" />

@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using System.IO;
@@ -54,6 +55,50 @@ namespace TestCentric.Engine.Helpers
             get { return _image.RuntimeVersion; }
         }
 
+        public AssemblyName[] AssemblyReferences
+        {
+            get
+            {
+                var tableInfo = GetTableInformation(Table.AssemblyRef);
+
+                var result = new List<AssemblyName>();
+
+                var data = _image.TableHeap.data;
+                var rdr = new ByteBuffer(data);
+                var offset = tableInfo.Offset;
+                rdr.Advance((int)offset);
+
+                for (int i = 0; i < tableInfo.Length; i++)
+                    result.Add(GetAssemblyReference(rdr));
+
+                offset += tableInfo.RowSize;
+
+                return result.ToArray();
+            }
+        }
+
+        private AssemblyName GetAssemblyReference(ByteBuffer rdr)
+        {
+            var version = new Version(rdr.ReadUInt16(), rdr.ReadUInt16(), rdr.ReadUInt16(), rdr.ReadUInt16());
+            var flags = rdr.ReadUInt32();
+            var key_idx = rdr.ReadUInt16();
+            var name_idx = rdr.ReadUInt16();
+            var culture_idx = rdr.ReadUInt16();
+            var hash_idx = rdr.ReadUInt16();
+
+            //_image.StringHeap.data
+            return new AssemblyName()
+            {
+                Name = _image.StringHeap.Read(name_idx),
+                Version = version,
+                Flags = (AssemblyNameFlags)flags,
+#if !NETSTANDARD1_6
+                KeyPair = new StrongNameKeyPair(_image.BlobHeap.Read(key_idx)),
+                CultureInfo = new CultureInfo(_image.StringHeap.Read(culture_idx)),
+#endif
+            };
+        }
+
         public void Dispose()
         {
             if (_image != null)
@@ -72,5 +117,16 @@ namespace TestCentric.Engine.Helpers
             IsValidPeFile = true;
             IsDotNetFile = true;
         }
+
+        internal bool HasTable(Table table)
+        {
+            return _image.TableHeap.HasTable(table);
+        }
+
+        private TableInformation GetTableInformation(Table table)
+        {
+            return _image.TableHeap.Tables[(int)table];
+        }
+
     }
 }
