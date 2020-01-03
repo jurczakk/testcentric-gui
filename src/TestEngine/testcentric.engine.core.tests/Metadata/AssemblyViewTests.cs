@@ -119,7 +119,7 @@ namespace TestCentric.Engine.Metadata
         [Test]
         public void CanEnumerateAssemblyAttributes()
         {
-            var path = GetAbsolutePath("TestCentric.Gui.Model.tests.dll");
+            var path = GetAbsolutePath("TestCentric.Gui.Model.Tests.dll");
             var assembly = AssemblyView.ReadAssembly(path);
 
             Assert.That(assembly.HasTable(Table.CustomAttribute));
