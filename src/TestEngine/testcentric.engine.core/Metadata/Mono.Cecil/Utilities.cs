@@ -47,7 +47,7 @@ namespace Mono.Cecil {
             return integer;
         }
 
-        // TestCentric: Not used
+        // TC: Not used
         //public static MetadataToken GetMetadataToken (this CodedIndex self, uint data)
         //{
         //	uint rid;

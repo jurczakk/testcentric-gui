@@ -9,11 +9,12 @@ using System.IO;
 using System.Reflection;
 using NUnit.Framework;
 using Mono.Cecil.Metadata;
+using TestCentric.Engine.Helpers;
 
-namespace TestCentric.Engine.Helpers
+namespace TestCentric.Engine.Metadata
 {
     [TestFixture]
-    public class AssemblyInspectorTests
+    public class AssemblyViewTests
     {
 #if !NETCOREAPP1_1
         [Test]
@@ -21,7 +22,7 @@ namespace TestCentric.Engine.Helpers
         {
             var assembly = Assembly.GetExecutingAssembly();
             var expectedPath = AssemblyHelper.GetAssemblyPath(assembly);
-            var rdr = AssemblyInspector.ReadAssembly(assembly);
+            var rdr = AssemblyView.ReadAssembly(assembly);
             Assert.That(rdr.AssemblyPath, Is.SamePath(expectedPath));
         }
 #endif
@@ -31,7 +32,7 @@ namespace TestCentric.Engine.Helpers
         public void InvalidAssemblyPathThrowsException(string path, Type exceptionType)
         {
             path = GetAbsolutePath(path);
-            Assert.That(() => AssemblyInspector.ReadAssembly(path), Throws.TypeOf(exceptionType));
+            Assert.That(() => AssemblyView.ReadAssembly(path), Throws.TypeOf(exceptionType));
         }
 
         [TestCase("TestCentric.Gui.Model.Tests.dll")]
@@ -43,19 +44,19 @@ namespace TestCentric.Engine.Helpers
         public void CanCreateFromPath(string path)
         {
             path = GetAbsolutePath(path);
-            var inspector = AssemblyInspector.ReadAssembly(path);
+            var assembly = AssemblyView.ReadAssembly(path);
 
-            Assert.That(inspector.AssemblyPath, Is.EqualTo(path));
-            Assert.True(inspector.IsValidPeFile);
-            Assert.True(inspector.IsDotNetFile);
+            Assert.That(assembly.AssemblyPath, Is.EqualTo(path));
+            Assert.True(assembly.IsValidPeFile);
+            Assert.True(assembly.IsDotNetFile);
         }
 
         [TestCase("net35/testcentric-agent.exe", false)]
         [TestCase("net35/testcentric-agent-x86.exe", true)]
         public void CanDetectRunAsX96(string path, bool runAsX86)
         {
-            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
-            Assert.That(inspector.ShouldRun32Bit, Is.EqualTo(runAsX86));
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            Assert.That(assembly.ShouldRun32Bit, Is.EqualTo(runAsX86));
         }
 
         [TestCase("TestCentric.Gui.Model.Tests.dll", "v4.0.30319")]
@@ -69,38 +70,68 @@ namespace TestCentric.Engine.Helpers
         [TestCase("netstandard1.6/testcentric.engine.core.dll", "v4.0.30319")]
         public void CanAccessRuntimeVersion(string path, string runtimeVersion)
         {
-            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
-            Assert.That(inspector.ImageRuntimeVersion, Is.EqualTo(runtimeVersion));
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            Assert.That(assembly.ImageRuntimeVersion, Is.EqualTo(runtimeVersion));
         }
 
-        [TestCase("TestCentric.Gui.Model.Tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("TestCentric.Gui.Model.Tests.dll", "nunit.framework")]
         [TestCase("TestCentric.Gui.Model.dll", "testcentric.engine.api")]
-        [TestCase("net35/testcentric.engine.core.tests.exe", "nunit.framework", "3.11.0.0")]
+        [TestCase("net35/testcentric.engine.core.tests.exe", "nunit.framework")]
         [TestCase("net35/testcentric.engine.core.dll", "testcentric.engine.api")]
-        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("netcoreapp2.1/testcentric.engine.core.tests.dll", "nunit.framework")]
         [TestCase("netcoreapp2.1/testcentric.engine.core.dll", "testcentric.engine.api")]
-        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll", "nunit.framework", "3.11.0.0")]
+        [TestCase("netcoreapp1.1/testcentric.engine.core.tests.dll", "nunit.framework")]
         [TestCase("netcoreapp1.1/testcentric.engine.core.dll", "testcentric.engine.api")]
         [TestCase("netstandard2.0/testcentric.engine.core.dll", "testcentric.engine.api")]
         [TestCase("netstandard1.6/testcentric.engine.core.dll", "testcentric.engine.api")]
-        public void CanEnumerateReferences(string path, string refName = null, string refVersion = null)
+        public void CanEnumerateReferences(string path, string refName = null)
         {
-            var inspector = AssemblyInspector.ReadAssembly(GetAbsolutePath(path));
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
 
-            Assert.That(inspector.HasTable(Table.AssemblyRef));
+            Assert.That(assembly.HasTable(Table.AssemblyRef));
 
             if (refName == null)
                 return;
 
-            foreach (var reference in inspector.AssemblyReferences)
+            foreach (var reference in assembly.AssemblyReferences)
                 if (reference.Name == refName)
                 {
-                    if (refVersion != null)
-                        Assert.That(reference.Version, Is.EqualTo(new Version(refVersion)));
+                    // See if our constructed AssemblyName matches one created by .NET.
+                    // We can only do this readily when the referenced assembly targets
+                    // .NET 3.5 and we are running under .NET 35, but it's still useful.
+#if NET35
+                    if (path.StartsWith("net35"))
+                    {
+                        var assumedFilePath = GetAbsolutePath(Path.Combine("net35", refName + ".dll"));
+                        if (File.Exists(assumedFilePath))
+                        {
+                            var expectedAssemblyName = AssemblyName.GetAssemblyName(assumedFilePath);
+                            Assert.That(reference.FullName, Is.EqualTo(expectedAssemblyName.FullName));
+                        }
+                    }
+#endif
                     Assert.Pass();
                 }
 
             Assert.Fail($"No reference to {refName} was found");
+        }
+
+        [Test]
+        public void CanEnumerateAssemblyAttributes()
+        {
+            var path = GetAbsolutePath("TestCentric.Gui.Model.tests.dll");
+            var assembly = AssemblyView.ReadAssembly(path);
+
+            Assert.That(assembly.HasTable(Table.CustomAttribute));
+            Assert.NotNull(assembly.CustomAttributes);
+            Console.WriteLine($"Found {assembly.CustomAttributes.Length} Attributes on the Assembly");
+
+            foreach (var attr in assembly.CustomAttributes)
+            {
+                Console.WriteLine($"Tag = {attr.Type & 7}");
+                Console.WriteLine($"Offset = {attr.Type >> 3}");
+                Console.WriteLine($"Blob = {attr.Value}");
+            }
         }
 
         // Convert relative paths to absolute based on the parent directory

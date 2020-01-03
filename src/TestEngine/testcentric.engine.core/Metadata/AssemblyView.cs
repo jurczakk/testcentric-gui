@@ -8,28 +8,31 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 using System.Text;
+using System.Diagnostics;
 using System.IO;
 using Mono.Cecil;
 using Mono.Cecil.PE;
 using Mono.Cecil.Metadata;
+using TestCentric.Engine.Helpers;
 
-namespace TestCentric.Engine.Helpers
+namespace TestCentric.Engine.Metadata
+
 {
     /// <summary>
     /// AssemblyInspector knows how to find various things in an assembly header
     /// </summary>
-    public class AssemblyInspector : IDisposable
+    public class AssemblyView : IDisposable
     {
         private Image _image;
 
-        public static AssemblyInspector ReadAssembly(string assemblyPath)
+        public static AssemblyView ReadAssembly(string assemblyPath)
         {
-            return new AssemblyInspector(assemblyPath);
+            return new AssemblyView(assemblyPath);
         }
 
-        public static AssemblyInspector ReadAssembly(Assembly assembly)
+        public static AssemblyView ReadAssembly(Assembly assembly)
         {
-            return new AssemblyInspector(AssemblyHelper.GetAssemblyPath(assembly));
+            return new AssemblyView(AssemblyHelper.GetAssemblyPath(assembly));
         }
 
         public string AssemblyPath { get; private set; }
@@ -59,44 +62,37 @@ namespace TestCentric.Engine.Helpers
         {
             get
             {
-                var tableInfo = GetTableInformation(Table.AssemblyRef);
-
                 var result = new List<AssemblyName>();
+                var rdr = new AssemblyRefTableReader(_image);
 
-                var data = _image.TableHeap.data;
-                var rdr = new ByteBuffer(data);
-                var offset = tableInfo.Offset;
-                rdr.Advance((int)offset);
-
-                for (int i = 0; i < tableInfo.Length; i++)
-                    result.Add(GetAssemblyReference(rdr));
-
-                offset += tableInfo.RowSize;
+                do
+                {
+                    result.Add(rdr.GetRow());
+                } while (rdr.NextRow());
 
                 return result.ToArray();
             }
         }
 
-        private AssemblyName GetAssemblyReference(ByteBuffer rdr)
+        public CustomAttributeData[] CustomAttributes
         {
-            var version = new Version(rdr.ReadUInt16(), rdr.ReadUInt16(), rdr.ReadUInt16(), rdr.ReadUInt16());
-            var flags = rdr.ReadUInt32();
-            var key_idx = rdr.ReadUInt16();
-            var name_idx = rdr.ReadUInt16();
-            var culture_idx = rdr.ReadUInt16();
-            var hash_idx = rdr.ReadUInt16();
-
-            //_image.StringHeap.data
-            return new AssemblyName()
+            get
             {
-                Name = _image.StringHeap.Read(name_idx),
-                Version = version,
-                Flags = (AssemblyNameFlags)flags,
-#if !NETSTANDARD1_6
-                KeyPair = new StrongNameKeyPair(_image.BlobHeap.Read(key_idx)),
-                CultureInfo = new CultureInfo(_image.StringHeap.Read(culture_idx)),
-#endif
-            };
+                var result = new List<CustomAttributeData>();
+                var rdr = new CustomAttributeTableReader(_image);
+
+                do
+                {
+                    var info = rdr.GetRow();
+                    // Only return attributes on the assembly itself
+                    if ((info.Parent & 31) == 14)
+                    {
+                        result.Add(info);
+                    }
+                } while (rdr.NextRow());
+
+                return result.ToArray();
+            }
         }
 
         public void Dispose()
@@ -105,7 +101,7 @@ namespace TestCentric.Engine.Helpers
                 _image.Dispose();
         }
 
-        private AssemblyInspector(string assemblyPath)
+        private AssemblyView(string assemblyPath)
         {
             AssemblyPath = assemblyPath;
 
