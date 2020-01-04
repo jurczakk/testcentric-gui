@@ -11,9 +11,9 @@
 using System;
 using System.IO;
 
-using Mono.Cecil.Cil;
+//using Mono.Cecil.Cil; //TC
 using Mono.Cecil.Metadata;
-using Mono.Collections.Generic;
+//using Mono.Collections.Generic; //TC
 
 using RVA = System.UInt32;
 

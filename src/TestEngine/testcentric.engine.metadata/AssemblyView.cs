@@ -13,7 +13,6 @@ using System.IO;
 using Mono.Cecil;
 using Mono.Cecil.PE;
 using Mono.Cecil.Metadata;
-using TestCentric.Engine.Helpers;
 
 namespace TestCentric.Engine.Metadata
 
@@ -30,11 +29,6 @@ namespace TestCentric.Engine.Metadata
             return new AssemblyView(assemblyPath);
         }
 
-        public static AssemblyView ReadAssembly(Assembly assembly)
-        {
-            return new AssemblyView(AssemblyHelper.GetAssemblyPath(assembly));
-        }
-
         public string AssemblyPath { get; private set; }
 
         public bool IsValidPeFile { get; private set; }
@@ -47,8 +41,8 @@ namespace TestCentric.Engine.Metadata
                 const ModuleAttributes nativeEntryPoint = (ModuleAttributes)16;
                 const ModuleAttributes mask = ModuleAttributes.Required32Bit | nativeEntryPoint;
 
-                return _image.Architecture != TargetArchitecture.AMD64 &&
-                       _image.Architecture != TargetArchitecture.IA64 &&
+                return Architecture != TargetArchitecture.AMD64 &&
+                       Architecture != TargetArchitecture.IA64 &&
                        (_image.Attributes & mask) != 0;
             }
         }
@@ -56,6 +50,11 @@ namespace TestCentric.Engine.Metadata
         public string ImageRuntimeVersion
         {
             get { return _image.RuntimeVersion; }
+        }
+
+        public TargetArchitecture Architecture
+        {
+            get { return _image.Architecture; }
         }
 
         public AssemblyName[] AssemblyReferences

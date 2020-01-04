@@ -16,17 +16,6 @@ namespace TestCentric.Engine.Metadata
     [TestFixture]
     public class AssemblyViewTests
     {
-#if !NETCOREAPP1_1
-        [Test]
-        public void CanCreateFromAssembly()
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            var expectedPath = AssemblyHelper.GetAssemblyPath(assembly);
-            var rdr = AssemblyView.ReadAssembly(assembly);
-            Assert.That(rdr.AssemblyPath, Is.SamePath(expectedPath));
-        }
-#endif
-
         [TestCase("testcentric.engine.api.xml", typeof(BadImageFormatException))]
         [TestCase("missing.assembly.dll", typeof(FileNotFoundException))]
         public void InvalidAssemblyPathThrowsException(string path, Type exceptionType)

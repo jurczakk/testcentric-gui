@@ -7,11 +7,13 @@
 //
 // Licensed under the MIT/X11 license.
 //
+// TestCentric Modifications -
+//   Charlie Poole (charliepoole@gmail.co
 
 using System;
 using System.IO;
 
-using Mono.Cecil.Cil;
+//TC//using Mono.Cecil.Cil;
 using Mono.Cecil.Metadata;
 using Mono.Collections.Generic;
 
