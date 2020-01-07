@@ -6,39 +6,40 @@
 using System;
 using System.Globalization;
 using System.Reflection;
+using Mono.Cecil;
 using Mono.Cecil.PE;
 using Mono.Cecil.Metadata;
 
+using StringIndex = System.UInt32;
+using BlobIndex = System.UInt32;
+
 namespace TestCentric.Engine.Metadata
 {
-    internal class AssemblyRefTableReader : TableReader<AssemblyName>
+    public struct AssemblyRefRow
     {
-        public AssemblyRefTableReader(Image image) : base(image, Table.AssemblyRef) { }
+        public Version Version;
+        public AssemblyAttributes Attributes;
+        public BlobIndex PublicKeyOrToken;
+        public String Name;
+        public String Culture;
+        public BlobIndex HashValue;
+    }
 
-        public override AssemblyName GetRow()
+    public class AssemblyRefTableReader : TableReader<AssemblyRefRow>
+    {
+        internal AssemblyRefTableReader(Image image) : base(image, Table.AssemblyRef) { }
+
+        public override AssemblyRefRow GetRow()
         {
-            var version = new Version(ReadUInt16(), ReadUInt16(), ReadUInt16(), ReadUInt16());
-            var flags = ReadUInt32();
-            var keyidx = GetBlobIndex();
-            uint nameidx = GetStringIndex();
-            var cultureidx = GetStringIndex();
-            var hashidx = GetBlobIndex();
-
-            var assemblyName = new AssemblyName();
-            assemblyName.Name = _image.StringHeap.Read(nameidx);
-            assemblyName.Version = version;
-            assemblyName.Flags = (AssemblyNameFlags)flags;
-
-#if !NETSTANDARD1_6
-            var keyOrToken = _image.BlobHeap.Read(keyidx);
-            if (keyOrToken.Length == 8)
-                assemblyName.SetPublicKeyToken(keyOrToken);
-            else // Assume full key
-                assemblyName.SetPublicKey(keyOrToken);
-            assemblyName.CultureInfo = new CultureInfo(_image.StringHeap.Read(cultureidx));
-#endif
-
-            return assemblyName;
+            return new AssemblyRefRow()
+            {
+                Version = new Version(ReadUInt16(), ReadUInt16(), ReadUInt16(), ReadUInt16()),
+                Attributes = (AssemblyAttributes)ReadUInt32(),
+                PublicKeyOrToken = GetBlobIndex(),
+                Name = GetString(),
+                Culture = GetString(),
+                HashValue = GetBlobIndex()
+            };
         }
     }
 }

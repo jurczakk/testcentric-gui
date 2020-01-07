@@ -3,35 +3,41 @@
 // Licensed under the MIT License. See LICENSE.txt in root directory.
 // ***********************************************************************
 
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Mono.Cecil.Metadata;
 using Mono.Cecil.PE;
 
-namespace NUnit.Engine.Metadata
-{
-    internal struct MemberRefData
-    {
-        uint Class;
-        uint Name;
-        uint Signature;
+using CodedRID = System.UInt32;
+using StringIndex = System.UInt32;
+using BlobIndex = System.UInt32;
 
-        public MemberRefData(uint @class, uint name, uint signature)
+namespace TestCentric.Engine.Metadata
+{
+    public struct MemberRefRow
+    {
+        private static readonly string[] TAGS = { "TypeDef", "TypeRef", "ModuleRef", "ModuleDef", "TypeSpec" };
+
+        public CodedRID Class;
+        public string Name;
+        public BlobIndex Signature;
+
+        public override string ToString()
         {
-            Class = @class;
-            Name = name;
-            Signature = signature;
+            return $"MemberRef: Class={TAGS[Class&7]}({Class>>3}) Name={Name}, Signature={Signature}";
         }
     }
 
-    internal class MemberRefTableReader : TableReader<MemberRefData>
+    public class MemberRefTableReader : TableReader<MemberRefRow>
     {
-        public MemberRefTableReader(Image image) : base(image, Table.MemberRef) { }
+        internal MemberRefTableReader(Image image) : base(image, Table.MemberRef) { }
 
-        public override MemberRefData GetRow()
+        public override MemberRefRow GetRow()
         {
-            return new MemberRefData(GetCodedIndex(CodedIndex.MemberRefParent), GetStringIndex(), GetBlobIndex());
+            return new MemberRefRow()
+            {
+                Class = GetCodedIndex(CodedIndex.MemberRefParent),
+                Name = GetString(),
+                Signature = GetBlobIndex()
+            };
         }
     }
 }

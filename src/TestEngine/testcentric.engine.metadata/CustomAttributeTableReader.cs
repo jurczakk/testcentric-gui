@@ -7,37 +7,44 @@ using System;
 using Mono.Cecil.PE;
 using Mono.Cecil.Metadata;
 
+using CodedRID = System.UInt32;
+using BlobIndex = System.UInt32;
+
 namespace TestCentric.Engine.Metadata
 {
-    public struct CustomAttributeData
+    public struct CustomAttributeRow
     {
-        public UInt32 Parent;
-        public UInt32 Type;
-        public UInt32 Value;
+        public CodedRID Parent;
+        public CodedRID Type;
+        public BlobIndex Value;
 
-        public CustomAttributeData(UInt32 parent, UInt32 type, UInt32 value)
+        private static string[] ParentType = new string[]
         {
-            Parent = parent;
-            Type = type;
-            Value = value;
+            "MethodDef", "FieldDef", "TypeRef", "TypeDef", "ParamDef", "InterfaceImpl", "MemberRef",
+            "Module", "Permission", "Property", "Event", "StandAloneSig", "ModuleRef", "TypeSpec",
+            "Assembly", "AssemblyRef", "File", "ExportedType", "ManifestResource"
+        };
+
+        public override string ToString()
+        {
+            var parent = $"{ParentType[Parent&31]}[{Parent>>5}]";
+            var type = $"({Type>>3},{Type&7})";
+            return $"CustomAttribute: Parent={parent}, Type={type}, Value={Value}";
         }
     }
 
-    internal class CustomAttributeTableReader : TableReader<CustomAttributeData>
+    public class CustomAttributeTableReader : TableReader<CustomAttributeRow>
     {
-        public CustomAttributeTableReader(Image image) : base(image, Table.CustomAttribute) { }
+        internal CustomAttributeTableReader(Image image) : base(image, Table.CustomAttribute) { }
 
-        public override CustomAttributeData GetRow()
+        public override CustomAttributeRow GetRow()
         {
-            var parent = GetCodedIndex(CodedIndex.HasCustomAttribute);
-            var type = GetCodedIndex(CodedIndex.TypeDefOrRef);
-            var value = GetBlobIndex();
-
-            var tag = type & 7;
-            var index = type >> 3;
-            var table = tag == 2 ? Table.TypeRef : Table.TypeRef;
-
-            return new CustomAttributeData(parent, type, value);
+            return new CustomAttributeRow()
+            {
+                Parent = GetCodedIndex(CodedIndex.HasCustomAttribute),
+                Type = GetCodedIndex(CodedIndex.TypeDefOrRef),
+                Value = GetBlobIndex()
+            };
         }
     }
 }

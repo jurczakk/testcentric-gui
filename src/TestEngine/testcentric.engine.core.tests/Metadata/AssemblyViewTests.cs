@@ -113,13 +113,13 @@ namespace TestCentric.Engine.Metadata
 
             Assert.That(assembly.HasTable(Table.CustomAttribute));
             Assert.NotNull(assembly.CustomAttributes);
-            Console.WriteLine($"Found {assembly.CustomAttributes.Length} Attributes on the Assembly");
 
             foreach (var attr in assembly.CustomAttributes)
             {
-                Console.WriteLine($"Tag = {attr.Type & 7}");
-                Console.WriteLine($"Offset = {attr.Type >> 3}");
-                Console.WriteLine($"Blob = {attr.Value}");
+                //Console.WriteLine($"ResolutionScope = {attr.ResolutionScope}");
+                //Console.WriteLine($"TypeName = {attr.TypeName}");
+                //Console.WriteLine($"TypeNamespace = {attr.TypeNamespace}");
+                Console.WriteLine(attr);
             }
         }
 

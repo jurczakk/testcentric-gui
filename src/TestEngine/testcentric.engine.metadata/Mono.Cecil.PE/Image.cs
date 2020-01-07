@@ -7,6 +7,8 @@
 //
 // Licensed under the MIT/X11 license.
 //
+// Modified for TestCentric:
+//   Charlie Poole (charliepoole@gmail.com)
 
 using System;
 using System.IO;

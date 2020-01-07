@@ -14,7 +14,8 @@ using System;
 
 namespace Mono.Cecil.PE {
 
-	class ByteBuffer {
+    // TC: Made class public
+	public class ByteBuffer {
 
 		internal byte [] buffer;
 		internal int length;

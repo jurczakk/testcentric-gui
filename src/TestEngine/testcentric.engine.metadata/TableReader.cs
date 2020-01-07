@@ -4,88 +4,104 @@
 // ***********************************************************************
 
 using System;
+using System.Collections.Generic;
 using Mono.Cecil.PE;
 using Mono.Cecil.Metadata;
 
-internal abstract class TableReader<TRow> : ByteBuffer
+namespace TestCentric.Engine.Metadata
 {
-    protected Image _image;
-    private int _stridx_size;
-    private int _blobidx_size;
-    private int _guididx_size;
-
-    private Table _table;
-    private TableInformation _info;
-    private uint _current;
-    private uint _eot;
-
-    public TableReader(Image image, Table table) : base(image.TableHeap.data)
+    public abstract class TableReader<TRow> : ByteBuffer
     {
-        _image = image;
-        _table = table;
+        internal Image _image;
+        private int _stridx_size;
+        private int _blobidx_size;
+        private int _guididx_size;
 
-        _stridx_size = _image.StringHeap.IndexSize;
-        _guididx_size = _image.GuidHeap != null ? _image.GuidHeap.IndexSize : 2;
-        _blobidx_size = _image.BlobHeap != null ? _image.BlobHeap.IndexSize : 2;
+        private Table _table;
+        private TableInformation _info;
+        private uint _current;
+        private uint _eot;
 
-        _info = _image.TableHeap.Tables[(int)table];
-        _current = _info.Offset;
-        _eot = _info.Offset + _info.Length * _info.RowSize;
+        internal TableReader(Image image, Table table) : base(image.TableHeap.data)
+        {
+            _image = image;
+            _table = table;
 
-        position = (int)_current;
-    }
+            _stridx_size = _image.StringHeap.IndexSize;
+            _guididx_size = _image.GuidHeap != null ? _image.GuidHeap.IndexSize : 2;
+            _blobidx_size = _image.BlobHeap != null ? _image.BlobHeap.IndexSize : 2;
 
-    public void GoToRow(uint row)
-    {
-        if (row >= _info.Length)
-            throw new ArgumentException("Invalid value for row", nameof(row));
+            _info = _image.TableHeap.Tables[(int)table];
+            _current = _info.Offset;
+            _eot = _info.Offset + _info.Length * _info.RowSize;
 
-        _current = _info.Offset + _info.RowSize * row;
-        position = (int)_current;
-    }
+            position = (int)_current;
+        }
 
-    public bool NextRow()
-    {
-        var next = _current + _info.RowSize;
-        if (next >= _eot)
-            return false;
+        public void GoToRow(uint row)
+        {
+            if (row < 1 || row > _info.Length)
+                throw new ArgumentException("Invalid value for row", nameof(row));
 
-        _current = next;
-        position = (int)_current;
+            _current = _info.Offset + _info.RowSize * (row - 1);
+            position = (int)_current;
+        }
 
-        return true;
-    }
+        public bool NextRow()
+        {
+            var next = _current + _info.RowSize;
+            if (next >= _eot)
+                return false;
 
-    public TRow GetRow(uint row)
-    {
-        GoToRow(row);
-        return GetRow();
-    }
+            _current = next;
+            position = (int)_current;
 
-    public abstract TRow GetRow();
+            return true;
+        }
 
-    protected uint GetStringIndex()
-    {
-        return GetIndexBySize(_stridx_size);
-    }
+        public TRow GetRow(uint row)
+        {
+            GoToRow(row);
+            return GetRow();
+        }
 
-    protected uint GetBlobIndex()
-    {
-        return GetIndexBySize(_blobidx_size);
-    }
+        public IEnumerable<TRow> GetRows(uint start = 1)
+        {
+            GoToRow(start);
 
-    protected uint GetGuidIndex()
-    {
-        return GetIndexBySize(_guididx_size);
-    }
+            do { yield return GetRow(); } while (NextRow());
+        }
 
-    protected uint GetCodedIndex(CodedIndex index)
-    {
-        return GetIndexBySize(_image.GetCodedIndexSize(index));
-    }
+        public abstract TRow GetRow();
 
-    private uint GetIndexBySize(int size)
-    {
-        return size == 4 ? ReadUInt32() : ReadUInt16();
+        protected string GetString()
+        {
+            return _image.StringHeap.Read(GetStringIndex());
+        }
+
+        protected uint GetStringIndex()
+        {
+            return GetIndexBySize(_stridx_size);
+        }
+
+        protected uint GetBlobIndex()
+        {
+            return GetIndexBySize(_blobidx_size);
+        }
+
+        protected uint GetGuidIndex()
+        {
+            return GetIndexBySize(_guididx_size);
+        }
+
+        protected uint GetCodedIndex(CodedIndex index)
+        {
+            return GetIndexBySize(_image.GetCodedIndexSize(index));
+        }
+
+        private uint GetIndexBySize(int size)
+        {
+            return size == 4 ? ReadUInt32() : ReadUInt16();
+        }
     }
 }

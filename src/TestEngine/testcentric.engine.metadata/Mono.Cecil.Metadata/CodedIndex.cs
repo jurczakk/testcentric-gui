@@ -10,8 +10,8 @@
 
 namespace Mono.Cecil.Metadata
 {
-
-    enum CodedIndex
+    // TC: Made public
+    public enum CodedIndex
     {
         TypeDefOrRef,
         HasConstant,

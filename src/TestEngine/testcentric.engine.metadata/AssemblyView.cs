@@ -22,8 +22,6 @@ namespace TestCentric.Engine.Metadata
     /// </summary>
     public class AssemblyView : IDisposable
     {
-        private Image _image;
-
         public static AssemblyView ReadAssembly(string assemblyPath)
         {
             return new AssemblyView(assemblyPath);
@@ -43,61 +41,103 @@ namespace TestCentric.Engine.Metadata
 
                 return Architecture != TargetArchitecture.AMD64 &&
                        Architecture != TargetArchitecture.IA64 &&
-                       (_image.Attributes & mask) != 0;
+                       (Image.Attributes & mask) != 0;
             }
         }
 
-        public string ImageRuntimeVersion
-        {
-            get { return _image.RuntimeVersion; }
-        }
+        internal Image Image { get; }
 
-        public TargetArchitecture Architecture
-        {
-            get { return _image.Architecture; }
-        }
+        public string ImageRuntimeVersion => Image.RuntimeVersion;
 
-        public AssemblyName[] AssemblyReferences
+        public TargetArchitecture Architecture => Image.Architecture;
+
+        private List<AssemblyName> _assemblyReferences;
+        public IEnumerable<AssemblyName> AssemblyReferences
         {
             get
             {
-                var result = new List<AssemblyName>();
-                var rdr = new AssemblyRefTableReader(_image);
-
-                do
-                {
-                    result.Add(rdr.GetRow());
-                } while (rdr.NextRow());
-
-                return result.ToArray();
+                return _assemblyReferences ?? (_assemblyReferences = GetAssemblyReferences());
             }
         }
 
-        public CustomAttributeData[] CustomAttributes
+        private List<AssemblyName> GetAssemblyReferences()
+        {
+            var rows = new AssemblyRefTableReader(Image).GetRows();
+            var refs = new List<AssemblyName>();
+
+            foreach (var row in rows)
+            {
+                var assemblyName = new AssemblyName()
+                {
+                    Name = row.Name,
+                    Version = row.Version,
+                    Flags = (AssemblyNameFlags)row.Attributes
+                };
+
+#if !NETSTANDARD1_6
+                var keyOrToken = Image.BlobHeap.Read(row.PublicKeyOrToken);
+                if (keyOrToken.Length == 8)
+                    assemblyName.SetPublicKeyToken(keyOrToken);
+                else // Assume full key
+                    assemblyName.SetPublicKey(keyOrToken);
+                assemblyName.CultureInfo = new CultureInfo(row.Culture);
+#endif
+                refs.Add(assemblyName);
+            }
+
+            return refs;
+        }
+
+        private IEnumerable<string> _customAttributes;
+        internal IEnumerable<string> CustomAttributes
         {
             get
             {
-                var result = new List<CustomAttributeData>();
-                var rdr = new CustomAttributeTableReader(_image);
+                return _customAttributes ?? (_customAttributes = GetCustomAttributes());
+            }
+        }
 
-                do
+        private List<CustomAttributeRow> _customAttributeRows;
+        private IEnumerable<string> GetCustomAttributes()
+        {
+            if (_customAttributeRows == null)
+                _customAttributeRows = new List<CustomAttributeRow>(new CustomAttributeTableReader(Image).GetRows());
+
+            foreach (var customAttributeRow in _customAttributeRows)
+            {
+                if ((customAttributeRow.Parent & 31) != 14)
+                    continue;
+
+                var typeTag = customAttributeRow.Type & 7;
+                var typeIndex = customAttributeRow.Type >> 3;
+
+                switch (typeTag)
                 {
-                    var info = rdr.GetRow();
-                    // Only return attributes on the assembly itself
-                    if ((info.Parent & 31) == 14)
-                    {
-                        result.Add(info);
-                    }
-                } while (rdr.NextRow());
+                    default:
+                        continue;
+                    case 3:
+                        var memberRef = new MemberRefTableReader(Image).GetRow(typeIndex);
 
-                return result.ToArray();
+                        var classIndex = memberRef.Class;
+                        var classTag = classIndex & 7;
+                        classIndex >>= 3;
+                        if (classTag == 1)
+                        {
+                            var typeRefRow = new TypeRefTableReader(Image).GetRow(classIndex);
+
+                            var typeNamespace = typeRefRow.TypeNamespace;
+                            var typeName = typeRefRow.TypeName;
+                            yield return $"Name = {typeName}, Namespace = {typeNamespace}";
+                        }
+                        break;
+                }
             }
         }
 
         public void Dispose()
         {
-            if (_image != null)
-                _image.Dispose();
+            if (Image != null)
+                Image.Dispose();
         }
 
         private AssemblyView(string assemblyPath)
@@ -105,7 +145,7 @@ namespace TestCentric.Engine.Metadata
             AssemblyPath = assemblyPath;
 
             var fs = new FileStream(AssemblyPath, FileMode.Open, FileAccess.Read);
-            _image = ImageReader.ReadImage(new Mono.Disposable<Stream>(fs, true), assemblyPath);
+            Image = ImageReader.ReadImage(new Mono.Disposable<Stream>(fs, true), assemblyPath);
 
             // Mono.Cecil throws an exception if either of these would be false
             // TODO: Should we catch it?
@@ -115,12 +155,12 @@ namespace TestCentric.Engine.Metadata
 
         internal bool HasTable(Table table)
         {
-            return _image.TableHeap.HasTable(table);
+            return Image.TableHeap.HasTable(table);
         }
 
         private TableInformation GetTableInformation(Table table)
         {
-            return _image.TableHeap.Tables[(int)table];
+            return Image.TableHeap.Tables[(int)table];
         }
 
     }
