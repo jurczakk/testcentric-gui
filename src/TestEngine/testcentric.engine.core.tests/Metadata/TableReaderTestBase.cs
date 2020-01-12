@@ -6,6 +6,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using NUnit.Framework;
 using Mono.Cecil.PE;
 
@@ -24,8 +25,13 @@ namespace TestCentric.Engine.Metadata
         protected List<TRow> _allRows;
         protected List<TRow> _enumRows;
 
-        // Derived classes must set this
-        protected static int ExpectedRowCount;
+        // Derived classes must override these
+        protected abstract int ExpectedRowCount { get; }
+        internal abstract TReader CreateReader(Image image);
+
+        // Override if desired
+        protected virtual bool DisplayRows => true;
+        protected virtual void PerformSanityChecks(TRow row) { }
 
         [OneTimeSetUp]
         public void Initialize()
@@ -36,13 +42,17 @@ namespace TestCentric.Engine.Metadata
             // NOTE: Order is important here.  The enumeration starts at current
             // position, initially tablestart, while GetRows() restarts at row 1.
             _enumRows = new List<TRow>();
-            do { _enumRows.Add(_reader.GetRow()); } while (_reader.NextRow());
+            var index = 0;
+            do {
+                ++index;
+                var row = _reader.GetRow();
+                _enumRows.Add(row);
+                if (DisplayRows)
+                    Console.WriteLine(row.ToString().Replace(":", $"({index}):"));
+            } while (_reader.NextRow());
 
             _allRows = new List<TRow>(_reader.GetRows());
         }
-
-        // Derived class overrides to supply the reader
-        internal abstract TReader CreateReader(Image image);
 
         [Test]
         public void EnumeratedRowsAndGetRowsGiveSameResults()
@@ -60,19 +70,14 @@ namespace TestCentric.Engine.Metadata
             }));
         }
 
-        static IEnumerable<TestCaseData> RandomRowNumbers()
-        {
-                yield return new TestCaseData(TestContext.CurrentContext.Random.Next(1, ExpectedRowCount));
-        }
-
         [Test]
         public void GetRowByIndex()
         {
-            int count = Math.Max(1, Math.Min(ExpectedRowCount / 5, 5));
+            int count = Math.Max(1, Math.Min(_allRows.Count / 5, 5));
 
             for (int i = 0; i < count; i++)
             {
-                int index = TestContext.CurrentContext.Random.Next(1, ExpectedRowCount);
+                int index = TestContext.CurrentContext.Random.Next(1, _allRows.Count);
                 var row = _reader.GetRow((uint)index);
                 Assert.That(row, Is.EqualTo(_allRows[index - 1]));
             }
@@ -88,6 +93,14 @@ namespace TestCentric.Engine.Metadata
         public void RowIndexThrowsArgumentException()
         {
             Assert.Throws<ArgumentException>(() => _reader.GetRow((uint)_allRows.Count + 1));
+        }
+
+        private static readonly Regex TYPENAME_REGEX = new Regex("^[a-zA-Z_][a-zA-Z_.`0-9]*$");
+
+        protected void CheckTypeName(string name)
+        {
+            if (name != ".<Module>") // Special case
+                Assert.That(TYPENAME_REGEX.IsMatch(name));
         }
     }
 }

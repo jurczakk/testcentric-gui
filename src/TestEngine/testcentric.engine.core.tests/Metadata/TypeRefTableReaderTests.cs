@@ -13,18 +13,8 @@ namespace TestCentric.Engine.Metadata
 {
     public class TypeRefTableReaderTests : TableReaderTestBase<TypeRefTableReader, TypeRefRow>
     {
-        private const int EXPECTED_ROW_COUNT = 26;
-
-        [OneTimeSetUp]
-        public void SetExpectations()
-        {
-            ExpectedRowCount = 26;
-        }
-
-        internal override TypeRefTableReader CreateReader(Image image)
-        {
-            return new TypeRefTableReader(image);
-        }
+        protected override int ExpectedRowCount => 26;
+        internal override TypeRefTableReader CreateReader(Image image) => new TypeRefTableReader(image);
 
         [TestCase("TestAttribute")]
         [TestCase("TestFixtureAttribute")]

@@ -117,10 +117,82 @@ namespace TestCentric.Engine.Metadata
             foreach (var attr in assembly.CustomAttributes)
             {
                 //Console.WriteLine($"ResolutionScope = {attr.ResolutionScope}");
-                //Console.WriteLine($"TypeName = {attr.TypeName}");
+                //Console.WriteLine($"TypeName = {attr.TypeName}");asa
                 //Console.WriteLine($"TypeNamespace = {attr.TypeNamespace}");
                 Console.WriteLine(attr);
             }
+        }
+
+        [TestCase("mock-assembly.dll", "NUnit.Framework.NonTestAssemblyAttribute", ExpectedResult = true)]
+        [TestCase("net35/mock-assembly.dll", "NUnit.Framework.NonTestAssemblyAttribute", ExpectedResult = false)]
+        [TestCase("netcoreapp2.1/mock-assembly.dll", "System.Reflection.AssemblyCopyrightAttribute", ExpectedResult = true)]
+        [TestCase("netcoreapp1.1/mock-assembly.dll", "System.Reflection.AssemblyTitleAttribute", ExpectedResult = true)]
+        public bool HasCustomAttribute(string path, string attrName)
+        {
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            return assembly.HasCustomAttribute(attrName);
+        }
+
+        [TestCase("mock-assembly.dll", "NUnit.Framework.NonTestAssemblyAttribute")]
+        [TestCase("net35/mock-assembly.dll", "System.Reflection.AssemblyCopyrightAttribute")]
+        [TestCase("netcoreapp2.1/mock-assembly.dll", "System.Reflection.AssemblyCopyrightAttribute")]
+        [TestCase("netcoreapp1.1/mock-assembly.dll", "System.Reflection.AssemblyTitleAttribute")]
+        public void GetCustomAttribute(string path, string attrName)
+        {
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            var attr = assembly.GetCustomAttribute(attrName);
+            Assert.NotNull(attr, "Attribute not found");
+            Assert.That(attr.FullName, Is.EqualTo(attrName));
+        }
+
+        [TestCase("NUnit.Framework.NonTestAssemblyAttribute")]
+        [TestCase("NUnit.Framework.LevelOfParallelismAttribute", 3)]
+        [TestCase("Test.Attributes.NoArgsAttribute")]
+        public void GetCustomAttributeAndArguments(string attrName, params object[] expectedArgs)
+        {
+            // For this test, we want the current build, so we use TestDirectory
+            var assembly = AssemblyView.ReadAssembly(Path.Combine(TestContext.CurrentContext.TestDirectory, "notest-assembly.dll"));
+            var attr = assembly.GetCustomAttribute(attrName);
+            Assert.NotNull(attr, "Attribute not found");
+            Assert.That(attr.FullName, Is.EqualTo(attrName));
+            Assert.That(attr.Arguments, Is.EqualTo(expectedArgs));
+        }
+
+        public enum TestAssemblyType
+        {
+            None,
+            NUnit2,
+            NUnit3
+        }
+
+        [TestCase("mock-assembly.dll", TestAssemblyType.NUnit3)]
+        [TestCase("testcentric.engine.api.dll", TestAssemblyType.None)]
+        [TestCase("v2-tests/mock-assembly.dll", TestAssemblyType.NUnit2)]
+        public void CanRecognizeTestAssemblies(string path, TestAssemblyType expectedType)
+        {
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            var actualType = TestAssemblyType.None;
+
+            foreach (var reference in assembly.AssemblyReferences)
+            {
+                if (reference.Name == "nunit.framework")
+                {
+                    actualType = reference.Version.Major >= 3 ? TestAssemblyType.NUnit3 : TestAssemblyType.NUnit2;
+                    break;
+                }
+            }
+
+            Assert.That(actualType, Is.EqualTo(expectedType));
+        }
+
+        [TestCase("mock-assembly.dll", ".NETFramework,Version=v4.5")]
+        [TestCase("net35/mock-assembly.dll", ".NETFramework,Version=v2.0")] // should be 3.5
+        [TestCase("netcoreapp2.1/mock-assembly.dll", ".NETCoreApp,Version=v2.1")]
+        [TestCase("netcoreapp1.1/mock-assembly.dll", ".NETCoreApp,Version=v1.1")]
+        public void CanDetectTargetRuntime(string path, string frameworkName)
+        {
+            var assembly = AssemblyView.ReadAssembly(GetAbsolutePath(path));
+            Assert.That(assembly.TargetFramework, Is.EqualTo(frameworkName));
         }
 
         // Convert relative paths to absolute based on the parent directory

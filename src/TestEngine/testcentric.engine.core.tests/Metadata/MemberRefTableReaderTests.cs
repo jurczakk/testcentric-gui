@@ -13,21 +13,8 @@ namespace TestCentric.Engine.Metadata
 {
     public class MemberRefTableReaderTests : TableReaderTestBase<MemberRefTableReader, MemberRefRow>
     {
-        const int EXPECTED_ROW_COUNT = 33;
-
-        [OneTimeSetUp]
-        public void SetExpectations()
-        {
-            ExpectedRowCount = 33;
-
-            foreach (var row in _allRows)
-                Console.WriteLine(row.ToString());
-        }
-
-        internal override MemberRefTableReader CreateReader(Image image)
-        {
-            return new MemberRefTableReader(image);
-        }
+        protected override int ExpectedRowCount => 33;
+        internal override MemberRefTableReader CreateReader(Image image) => new MemberRefTableReader(image);
 
         [TestCase("Pass")]
         [TestCase("Fail")]

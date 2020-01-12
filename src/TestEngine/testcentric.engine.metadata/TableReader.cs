@@ -99,6 +99,11 @@ namespace TestCentric.Engine.Metadata
             return GetIndexBySize(_image.GetCodedIndexSize(index));
         }
 
+        internal uint GetTableIndex()
+        {
+            return GetIndexBySize(_image.TableHeap.IndexSize);
+        }
+
         private uint GetIndexBySize(int size)
         {
             return size == 4 ? ReadUInt32() : ReadUInt16();

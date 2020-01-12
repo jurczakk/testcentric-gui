@@ -15,21 +15,8 @@ namespace TestCentric.Engine.Metadata
 {
     public class CustomAttributeTableReaderTests : TableReaderTestBase<CustomAttributeTableReader, CustomAttributeRow>
     {
-        const int EXPECTED_ROW_COUNT = 61;
-
-        [OneTimeSetUp]
-        public void SetExpectations()
-        {
-            ExpectedRowCount = 61;
-            foreach (var row in _allRows)
-                Console.WriteLine(row.ToString());
-        }
-
-        internal override CustomAttributeTableReader CreateReader(Image image)
-        {
-            return new CustomAttributeTableReader(image);
-        }
-
+        protected override int ExpectedRowCount => 61;
+        internal override CustomAttributeTableReader CreateReader(Image image) => new CustomAttributeTableReader(image);
 
         //[Test]
         //public void ExpectedAttributesArePresent()

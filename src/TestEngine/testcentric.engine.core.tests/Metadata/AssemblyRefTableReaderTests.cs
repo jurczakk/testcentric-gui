@@ -18,17 +18,7 @@ namespace TestCentric.Engine.Metadata
     {
         static readonly string[] EXPECTED_REFERENCES = new[] { "mscorlib", "nunit.framework", "System" };
 
-        [OneTimeSetUp]
-        public void SetExpectations()
-        {
-            ExpectedRowCount = 3;
-            foreach (var row in _allRows)
-                Console.WriteLine(row.ToString());
-        }
-
-        internal override AssemblyRefTableReader CreateReader(Image image)
-        {
-            return new AssemblyRefTableReader(image);
-        }
+        protected override int ExpectedRowCount => 3;
+        internal override AssemblyRefTableReader CreateReader(Image image) => new AssemblyRefTableReader(image);
     }
 }

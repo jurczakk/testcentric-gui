@@ -22,10 +22,29 @@ namespace TestCentric.Engine.Metadata
     /// </summary>
     public class AssemblyView : IDisposable
     {
+        private CustomAttributeBuilder _customAttributeBuilder;
+
         public static AssemblyView ReadAssembly(string assemblyPath)
         {
             return new AssemblyView(assemblyPath);
         }
+
+        private AssemblyView(string assemblyPath)
+        {
+            AssemblyPath = assemblyPath;
+
+            var fs = new FileStream(AssemblyPath, FileMode.Open, FileAccess.Read);
+            Image = ImageReader.ReadImage(new Mono.Disposable<Stream>(fs, true), assemblyPath);
+
+            // Mono.Cecil throws an exception if either of these would be false
+            // TODO: Should we catch it?
+            IsValidPeFile = true;
+            IsDotNetFile = true;
+
+            _customAttributeBuilder = new CustomAttributeBuilder(Image);
+        }
+
+        #region General Properties
 
         public string AssemblyPath { get; private set; }
 
@@ -50,6 +69,10 @@ namespace TestCentric.Engine.Metadata
         public string ImageRuntimeVersion => Image.RuntimeVersion;
 
         public TargetArchitecture Architecture => Image.Architecture;
+
+        #endregion
+
+        #region Assembly References
 
         private List<AssemblyName> _assemblyReferences;
         public IEnumerable<AssemblyName> AssemblyReferences
@@ -88,8 +111,12 @@ namespace TestCentric.Engine.Metadata
             return refs;
         }
 
-        private IEnumerable<string> _customAttributes;
-        internal IEnumerable<string> CustomAttributes
+        #endregion
+
+        #region Custom Attributes
+
+        private IEnumerable<CustomAttribute> _customAttributes;
+        public IEnumerable<CustomAttribute> CustomAttributes
         {
             get
             {
@@ -97,8 +124,51 @@ namespace TestCentric.Engine.Metadata
             }
         }
 
+        public string TargetFramework
+        {
+            get
+            {
+                var attr = GetCustomAttribute("System.Runtime.Versioning.TargetFrameworkAttribute");
+
+                if (attr != null)
+                    return (string)attr.Arguments[0];
+
+                if (ImageRuntimeVersion[0] == 'v')
+                {
+                    var version = new Version(ImageRuntimeVersion.Substring(1));
+                    switch (version.Major)
+                    {
+                        case 4:
+                            return ".NETFramework,Version=v4.0";
+                        case 2:
+                            return ".NETFramework,Version=v2.0";
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        public bool HasCustomAttribute(string fullName)
+        {
+            foreach (var attr in CustomAttributes)
+                if (attr.FullName == fullName)
+                    return true;
+            
+            return false;
+        }
+
+        public CustomAttribute GetCustomAttribute(string fullName)
+        {
+            foreach (var attr in CustomAttributes)
+                if (attr.FullName == fullName)
+                    return attr;
+
+            return null;
+        }
+
         private List<CustomAttributeRow> _customAttributeRows;
-        private IEnumerable<string> GetCustomAttributes()
+        private IEnumerable<CustomAttribute> GetCustomAttributes()
         {
             if (_customAttributeRows == null)
                 _customAttributeRows = new List<CustomAttributeRow>(new CustomAttributeTableReader(Image).GetRows());
@@ -108,31 +178,13 @@ namespace TestCentric.Engine.Metadata
                 if ((customAttributeRow.Parent & 31) != 14)
                     continue;
 
-                var typeTag = customAttributeRow.Type & 7;
-                var typeIndex = customAttributeRow.Type >> 3;
-
-                switch (typeTag)
-                {
-                    default:
-                        continue;
-                    case 3:
-                        var memberRef = new MemberRefTableReader(Image).GetRow(typeIndex);
-
-                        var classIndex = memberRef.Class;
-                        var classTag = classIndex & 7;
-                        classIndex >>= 3;
-                        if (classTag == 1)
-                        {
-                            var typeRefRow = new TypeRefTableReader(Image).GetRow(classIndex);
-
-                            var typeNamespace = typeRefRow.TypeNamespace;
-                            var typeName = typeRefRow.TypeName;
-                            yield return $"Name = {typeName}, Namespace = {typeNamespace}";
-                        }
-                        break;
-                }
+                var attr = _customAttributeBuilder.BuildCustomAttribute(customAttributeRow);
+                if (attr != null)
+                    yield return attr;
             }
         }
+
+        #endregion
 
         public void Dispose()
         {
@@ -140,28 +192,9 @@ namespace TestCentric.Engine.Metadata
                 Image.Dispose();
         }
 
-        private AssemblyView(string assemblyPath)
-        {
-            AssemblyPath = assemblyPath;
-
-            var fs = new FileStream(AssemblyPath, FileMode.Open, FileAccess.Read);
-            Image = ImageReader.ReadImage(new Mono.Disposable<Stream>(fs, true), assemblyPath);
-
-            // Mono.Cecil throws an exception if either of these would be false
-            // TODO: Should we catch it?
-            IsValidPeFile = true;
-            IsDotNetFile = true;
-        }
-
         internal bool HasTable(Table table)
         {
             return Image.TableHeap.HasTable(table);
         }
-
-        private TableInformation GetTableInformation(Table table)
-        {
-            return Image.TableHeap.Tables[(int)table];
-        }
-
     }
 }

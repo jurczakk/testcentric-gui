@@ -3,6 +3,7 @@
 // Licensed under the MIT License. See LICENSE.txt in root directory.
 // ***********************************************************************
 
+using System;
 using Mono.Cecil.Metadata;
 using Mono.Cecil.PE;
 
@@ -11,31 +12,37 @@ using StringIndex = System.UInt32;
 
 namespace TestCentric.Engine.Metadata
 {
-    public struct TypeRefRow
+    public struct TypeDefRow
     {
-        public CodedRID ResolutionScope;
+        public UInt32 Flags;
         public string TypeName;
         public string TypeNamespace;
+        public CodedRID Extends;
+        public UInt32 FieldList;
+        public UInt32 MethodList;
 
         public string FullName => TypeNamespace + "." + TypeName;
 
         public override string ToString()
         {
-            return $"TypeRef: {FullName}, Scope={ResolutionScope}";
+            return $"TypeDef: {FullName}, Extends={Extends}, FieldList={FieldList}, MethodList={MethodList}";
         }
     }
 
-    public class TypeRefTableReader : TableReader<TypeRefRow>
+    public class TypeDefTableReader : TableReader<TypeDefRow>
     {
-        internal TypeRefTableReader(Image image) : base(image, Table.TypeRef) { }
+        internal TypeDefTableReader(Image image) : base(image, Table.TypeDef) { }
 
-        public override TypeRefRow GetRow()
+        public override TypeDefRow GetRow()
         {
-            return new TypeRefRow()
+            return new TypeDefRow()
             {
-                ResolutionScope = GetCodedIndex(CodedIndex.ResolutionScope),
+                Flags = ReadUInt32(),
                 TypeName = GetString(),
-                TypeNamespace = GetString()
+                TypeNamespace = GetString(),
+                Extends = GetCodedIndex(CodedIndex.TypeDefOrRef),
+                FieldList = GetTableIndex(),
+                MethodList = GetTableIndex()
             };
         }
     }

@@ -3,6 +3,7 @@
 // Licensed under the MIT License. See LICENSE.txt in root directory.
 // ***********************************************************************
 
+using System;
 using Mono.Cecil.Metadata;
 using Mono.Cecil.PE;
 
@@ -12,31 +13,37 @@ using BlobIndex = System.UInt32;
 
 namespace TestCentric.Engine.Metadata
 {
-    public struct MemberRefRow
+    public struct MethodDefRow
     {
         private static readonly string[] TAGS = { "TypeDef", "TypeRef", "ModuleRef", "ModuleDef", "TypeSpec" };
 
-        public CodedRID Class;
+        public UInt32 RVA;
+        public UInt16 ImplFlags;
+        public UInt16 Flags;
         public string Name;
         public BlobIndex Signature;
+        public UInt32 ParamList;
 
         public override string ToString()
         {
-            return $"MemberRef: {Name}";
+            return $"MethodDef: {Name}";
         }
     }
 
-    public class MemberRefTableReader : TableReader<MemberRefRow>
+    public class MethodDefTableReader : TableReader<MethodDefRow>
     {
-        internal MemberRefTableReader(Image image) : base(image, Table.MemberRef) { }
+        internal MethodDefTableReader(Image image) : base(image, Table.Method) { }
 
-        public override MemberRefRow GetRow()
+        public override MethodDefRow GetRow()
         {
-            return new MemberRefRow()
+            return new MethodDefRow()
             {
-                Class = GetCodedIndex(CodedIndex.MemberRefParent),
+                RVA = ReadUInt32(),
+                ImplFlags = ReadUInt16(),
+                Flags = ReadUInt16(),
                 Name = GetString(),
-                Signature = GetBlobIndex()
+                Signature = GetBlobIndex(),
+                ParamList = GetTableIndex()
             };
         }
     }

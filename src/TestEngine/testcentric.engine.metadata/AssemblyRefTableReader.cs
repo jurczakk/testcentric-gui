@@ -23,6 +23,11 @@ namespace TestCentric.Engine.Metadata
         public String Name;
         public String Culture;
         public BlobIndex HashValue;
+
+        public override string ToString()
+        {
+            return $"AssemblyRef: {Name}, Version={Version}, Culture={Culture}";
+        }
     }
 
     public class AssemblyRefTableReader : TableReader<AssemblyRefRow>
